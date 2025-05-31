@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Half Marathon Training Calendar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Light gray background */
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Align to top for better scrolling */
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .calendar-container {
+            width: 100%;
+            max-width: 900px; /* Max width for larger screens */
+            background-color: #ffffff;
+            border-radius: 1rem; /* rounded-xl */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* shadow-xl */
+            padding: 1.5rem; /* p-6 */
+            box-sizing: border-box;
+        }
+        .day-cell {
+            min-height: 120px; /* Minimum height for day cells */
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start; /* Align content to top-left */
+            padding: 0.5rem; /* p-2 */
+            border-radius: 0.5rem; /* rounded-md */
+            transition: background-color 0.2s ease-in-out;
+            cursor: pointer;
+        }
+        .activity-item {
+            cursor: pointer;
+            padding: 0.25rem 0.5rem; /* py-1 px-2 */
+            margin-bottom: 0.25rem; /* mb-1 */
+            border-radius: 0.5rem; /* rounded-md */
+            font-size: 0.875rem; /* text-sm */
+            transition: background-color 0.3s ease, color 0.3s ease;
+            width: 100%; /* Ensure activity items take full width */
+            text-align: left;
+            word-wrap: break-word; /* Ensure text wraps */
+        }
+        .activity-item.completed {
+            background-color: #4CAF50; /* Green background */
+            color: white;
+        }
+        .activity-item.incomplete {
+            background-color: #f0f0f0; /* Light grey for not completed */
+            color: #333;
+        }
+        .activity-item:hover {
+            opacity: 0.8;
+        }
+        /* Style for days outside the current month */
+        .other-month {
+            opacity: 0.4;
+        }
+
+        /* Responsive adjustments for the calendar grid */
+        @media (max-width: 640px) {
+            .calendar-grid {
+                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); /* Adjust column width for small screens */
+            }
+            .day-cell {
+                min-height: 100px; /* Smaller height for mobile */
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+    <div class="calendar-container">
+        <div class="flex justify-between items-center mb-6">
+            <button id="prevMonth" class="px-4 py-2 bg-blue-500 text-white rounded-lg shadow-md hover:bg-blue-600 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">Previous</button>
+            <h2 id="currentMonthYear" class="text-3xl font-bold text-gray-800"></h2>
+            <button id="nextMonth" class="px-4 py-2 bg-blue-500 text-white rounded-lg shadow-md hover:bg-blue-600 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">Next</button>
+        </div>
+
+        <div class="grid grid-cols-7 text-center font-semibold text-gray-600 mb-4">
+            <div>Sun</div>
+            <div>Mon</div>
+            <div>Tue</div>
+            <div>Wed</div>
+            <div>Thu</div>
+            <div>Fri</div>
+            <div>Sat</div>
+        </div>
+
+        <div id="calendarGrid" class="grid grid-cols-7 gap-3">
+            </div>
+
+        <div id="messageBox" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center hidden z-50">
+            <div class="bg-white p-6 rounded-xl shadow-lg flex flex-col items-center">
+                <p id="messageText" class="text-gray-800 text-lg mb-4"></p>
+                <button id="closeMessageBox" class="px-6 py-3 bg-blue-500 text-white rounded-lg shadow-md hover:bg-blue-600 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Get references to DOM elements
+        const calendarGrid = document.getElementById('calendarGrid');
+        const currentMonthYear = document.getElementById('currentMonthYear');
+        const prevMonthBtn = document.getElementById('prevMonth');
+        const nextMonthBtn = document.getElementById('nextMonth');
+        const messageBox = document.getElementById('messageBox');
+        const messageText = document.getElementById('messageText');
+        const closeMessageBoxBtn = document.getElementById('closeMessageBox');
+
+        // Initialize current date to May 2025 to align with the training plan start
+        let currentDate = new Date(2025, 4, 1); // Month is 0-indexed (4 = May)
+
+        // Training plan data (YYYY-MM-DD format)
+        // This data is parsed from your previous request, starting from Saturday, May 24, 2025.
+        // It includes all 13 weeks leading up to the race on August 16, 2025.
+        const trainingPlan = {
+            "2025-05-24": ["Long Run - 4 miles Easy"],
+            "2025-05-25": ["Rest or X-Train"],
+            "2025-05-26": ["Rest or X-Train"],
+            "2025-05-27": ["Easy Run - 2 miles Easy + 4 x 100m Strides"],
+            "2025-05-28": ["Rest or Strength"],
+            "2025-05-29": ["Easy Run - 2.5 miles Easy"],
+            "2025-05-30": ["Rest"],
+            "2025-05-31": ["Long Run - 5 miles Easy"],
+            "2025-06-01": ["Rest or X-Train"],
+            "2025-06-02": ["Rest or X-Train"],
+            "2025-06-03": ["Easy Run - 2.5 miles Easy + 4 x 100m Strides"],
+            "2025-06-04": ["Rest or Strength"],
+            "2025-06-05": ["Easy Run - 3 miles Easy"],
+            "2025-06-06": ["Rest"],
+            "2025-06-07": ["Long Run - 6 miles Easy"],
+            "2025-06-08": ["Rest or X-Train"],
+            "2025-06-09": ["Rest or X-Train"],
+            "2025-06-10": ["Tempo Run - 1 mile Easy warm-up, 2 miles at Tempo pace, 1 mile Easy cool-down (Total: 4 miles)"],
+            "2025-06-11": ["Rest or Strength"],
+            "2025-06-12": ["Easy Run - 3 miles Easy"],
+            "2025-06-13": ["Rest"],
+            "2025-06-14": ["Long Run - 7 miles Easy"],
+            "2025-06-15": ["Rest or X-Train"],
+            "2025-06-16": ["Rest or X-Train"],
+            "2025-06-17": ["Tempo Run - 1 mile Easy warm-up, 2.5 miles at Tempo pace, 1 mile Easy cool-down (Total: 4.5 miles)"],
+            "2025-06-18": ["Rest or Strength"],
+            "2025-06-19": ["Easy Run - 3 miles Easy + 6 x 100m Strides"],
+            "2025-06-20": ["Rest"],
+            "2025-06-21": ["Long Run - 8 miles Easy"],
+            "2025-06-22": ["Rest or X-Train"],
+            "2025-06-23": ["Rest or X-Train"],
+            "2025-06-24": ["Tempo Run - 1 mile Easy warm-up, 3 miles at Tempo pace, 1 mile Easy cool-down (Total: 5 miles)"],
+            "2025-06-25": ["Rest or Strength"],
+            "2025-06-26": ["Easy Run - 3.5 miles Easy"],
+            "2025-06-27": ["Rest"],
+            "2025-06-28": ["Long Run - 9 miles Easy"],
+            "2025-06-29": ["Rest or X-Train"],
+            "2025-06-30": ["Rest or X-Train"],
+            "2025-07-01": ["Tempo Run - 1 mile Easy warm-up, 3 miles at Tempo pace, 1 mile Easy cool-down (Total: 5 miles)"],
+            "2025-07-02": ["Rest or Strength"],
+            "2025-07-03": ["Easy Run - 3.5 miles Easy + 6 x 100m Strides"],
+            "2025-07-04": ["Rest"],
+            "2025-07-05": ["Long Run - 10 miles Easy"],
+            "2025-07-06": ["Rest or X-Train"],
+            "2025-07-07": ["Rest or X-Train"],
+            "2025-07-08": ["Tempo Run - 1 mile Easy warm-up, 3.5 miles at Tempo pace, 1 mile Easy cool-down (Total: 5.5 miles)"],
+            "2025-07-09": ["Rest or Strength"],
+            "2025-07-10": ["Easy Run - 4 miles Easy"],
+            "2025-07-11": ["Rest"],
+            "2025-07-12": ["Long Run - 11 miles Easy"],
+            "2025-07-13": ["Rest or X-Train"],
+            "2025-07-14": ["Rest or X-Train"],
+            "2025-07-15": ["Tempo Run - 1 mile Easy warm-up, 4 miles at Tempo pace, 1 mile Easy cool-down (Total: 6 miles)"],
+            "2025-07-16": ["Rest or Strength"],
+            "2025-07-17": ["Easy Run - 4 miles Easy + 6 x 100m Strides"],
+            "2025-07-18": ["Rest"],
+            "2025-07-19": ["Long Run - 12 miles Easy"],
+            "2025-07-20": ["Rest or X-Train"],
+            "2025-07-21": ["Rest or X-Train"],
+            "2025-07-22": ["Tempo Run - 1 mile Easy warm-up, 3 miles at Tempo pace, 1 mile Easy cool-down (Total: 5 miles)"],
+            "2025-07-23": ["Rest or Strength"],
+            "2025-07-24": ["Easy Run - 4 miles Easy"],
+            "2025-07-25": ["Rest"],
+            "2025-07-26": ["Long Run - 8 miles Easy"],
+            "2025-07-27": ["Rest or X-Train"],
+            "2025-07-28": ["Rest or X-Train"],
+            "2025-07-29": ["Easy Run - 3 miles Easy + 4 x 100m Strides"],
+            "2025-07-30": ["Rest or Strength"],
+            "2025-07-31": ["Easy Run - 3 miles Easy"],
+            "2025-08-01": ["Rest"],
+            "2025-08-02": ["Long Run - 6 miles Easy"],
+            "2025-08-03": ["Rest or X-Train"],
+            "2025-08-04": ["Rest or X-Train"],
+            "2025-08-05": ["Easy Run - 2.5 miles Easy"],
+            "2025-08-06": ["Rest or Strength"],
+            "2025-08-07": ["Easy Run - 2.5 miles Easy + 4 x 100m Strides"],
+            "2025-08-08": ["Rest"],
+            "2025-08-09": ["Long Run - 4 miles Easy"],
+            "2025-08-10": ["Rest or X-Train"],
+            "2025-08-11": ["Rest or X-Train"],
+            "2025-08-12": ["Easy Run - 2 miles Easy"],
+            "2025-08-13": ["Rest or Strength"],
+            "2025-08-14": ["Easy Run - 1.5 miles Easy"],
+            "2025-08-15": ["Rest"],
+            "2025-08-16": ["RACE DAY! HALF MARATHON!"], // Race Day
+        };
+
+        // Function to format date as YYYY-MM-DD
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        // Function to show a custom message box
+        function showMessageBox(message) {
+            messageText.textContent = message;
+            messageBox.classList.remove('hidden');
+        }
+
+        // Event listener for closing the message box
+        closeMessageBoxBtn.addEventListener('click', () => {
+            messageBox.classList.add('hidden');
+        });
+
+        // Function to render the calendar
+        function renderCalendar() {
+            calendarGrid.innerHTML = ''; // Clear previous days
+
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth(); // 0-indexed
+
+            // Set current month and year display
+            currentMonthYear.textContent = new Date(year, month).toLocaleString('en-US', {
+                month: 'long',
+                year: 'numeric'
+            });
+
+            // Get the first day of the month (0 for Sunday, 1 for Monday...)
+            const firstDayOfMonth = new Date(year, month, 1).getDay();
+            // Get the number of days in the current month
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            // Get the number of days in the previous month for padding
+            const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+            // Populate days from the end of the previous month (for visual continuity)
+            for (let i = firstDayOfMonth; i > 0; i--) {
+                const dayCell = document.createElement('div');
+                dayCell.classList.add('day-cell', 'bg-gray-200', 'other-month', 'text-gray-400');
+                dayCell.textContent = daysInPrevMonth - i + 1;
+                calendarGrid.appendChild(dayCell);
+            }
+
+            // Populate current month's days
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayCell = document.createElement('div');
+                dayCell.classList.add('day-cell', 'bg-gray-50', 'hover:bg-gray-100', 'border', 'border-gray-200', 'relative');
+                dayCell.innerHTML = `<span class="text-lg font-bold text-gray-700">${day}</span>`;
+
+                const fullDate = new Date(year, month, day);
+                const formattedDate = formatDate(fullDate);
+
+                // Add activities for the day
+                if (trainingPlan[formattedDate]) {
+                    trainingPlan[formattedDate].forEach(activity => {
+                        const activityItem = document.createElement('div');
+                        activityItem.textContent = activity;
+                        activityItem.classList.add('activity-item', 'mt-1', 'text-gray-800');
+                        activityItem.dataset.date = formattedDate; // Store date
+                        activityItem.dataset.activity = activity; // Store activity text
+
+                        // Check localStorage for completion status
+                        const isCompleted = localStorage.getItem(`completed-${formattedDate}-${activity}`) === 'true';
+                        if (isCompleted) {
+                            activityItem.classList.add('completed');
+                        } else {
+                            activityItem.classList.add('incomplete');
+                        }
+
+                        // Add click listener to toggle completion
+                        activityItem.addEventListener('click', (event) => {
+                            event.stopPropagation(); // Prevent toggling the day cell itself if it had a listener
+                            toggleActivityCompletion(activityItem);
+                        });
+                        dayCell.appendChild(activityItem);
+                    });
+                } else {
+                    // If no training for the day, add a placeholder for consistency
+                    const noActivityItem = document.createElement('div');
+                    noActivityItem.textContent = "Rest/No Planned Activity";
+                    noActivityItem.classList.add('activity-item', 'mt-1', 'text-gray-500', 'text-xs', 'bg-gray-100');
+                    dayCell.appendChild(noActivityItem);
+                }
+                calendarGrid.appendChild(dayCell);
+            }
+
+            // Populate days from the beginning of the next month (for visual continuity)
+            const totalCells = firstDayOfMonth + daysInMonth;
+            const remainingCells = (totalCells % 7 === 0) ? 0 : 7 - (totalCells % 7);
+            for (let i = 1; i <= remainingCells; i++) {
+                const dayCell = document.createElement('div');
+                dayCell.classList.add('day-cell', 'bg-gray-200', 'other-month', 'text-gray-400');
+                dayCell.textContent = i;
+                calendarGrid.appendChild(dayCell);
+            }
+        }
+
+        // Function to toggle activity completion status
+        function toggleActivityCompletion(activityItem) {
+            const date = activityItem.dataset.date;
+            const activity = activityItem.dataset.activity;
+            const key = `completed-${date}-${activity}`;
+
+            // Toggle classes
+            if (activityItem.classList.contains('completed')) {
+                activityItem.classList.remove('completed');
+                activityItem.classList.add('incomplete');
+                localStorage.setItem(key, 'false'); // Store status in localStorage
+                showMessageBox(`Marked '${activity}' on ${date} as INCOMPLETE.`);
+            } else {
+                activityItem.classList.remove('incomplete');
+                activityItem.classList.add('completed');
+                localStorage.setItem(key, 'true'); // Store status in localStorage
+                showMessageBox(`Marked '${activity}' on ${date} as COMPLETE!`);
+            }
+        }
+
+        // Event listeners for month navigation
+        prevMonthBtn.addEventListener('click', () => {
+            currentDate.setMonth(currentDate.getMonth() - 1);
+            renderCalendar();
+        });
+
+        nextMonthBtn.addEventListener('click', () => {
+            currentDate.setMonth(currentDate.getMonth() + 1);
+            renderCalendar();
+        });
+
+        // Initial render of the calendar
+        renderCalendar();
+    </script>
+</body>
+</html>
